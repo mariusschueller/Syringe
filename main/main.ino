@@ -2,46 +2,37 @@
 
 AccelStepper stepper(AccelStepper::DRIVER, 3, 2); 
 
-float flowRate = 0.0;  // In (mL/min). This will be used to determine speed. Will change with Potentiometer
+// In (mL/min). This will be used to determine speed. Will change with Potentiometer
+//Will be a max
+float maxFlowRate = 50.0;
+float flowRate = maxFlowRate;
 
 int speed;  //this will change depending on the Potentiometer reading...should it be a float?
 
-float syringeDiameter = 1.0;
+float syringeDiameter = 14.0; //14 mm or 18.5 mm according to what I measured
+
+ //8mm lead screw
+int leadScrewPitch = 8;
+
+//BUTTON STUFF
+const int startButtonPin = 7;  // the number of the pushbutton pin
+const int clockwiseButtonPin = 12;  // the number of the pushbutton pin
+
+const int counterButtonPin = 13;  // the number of the pushbutton pin
+
+
+// LIMIT SWITCH
+int limitSwitch = 6;  // the number of the limit switch pin
+
+
+//LED CODE HERE
+int red_LED = 9;
+int green_LED = 10;
+int blue_LED = 11;
 
 //POTENTIOMETER STUFF
 // INPUT: Potentiometer should be connected to 5V and GND
-/*
-int potPin = A3; // Potentiometer output connected to analog pin 3
-int potVal = 0; // Variable to store the input from the potentiometer
 
-potVal = analogRead(potPin);   // read the potentiometer value at the input pin
-*/
-
-//BUTTON STUFF
-const int button1Pin = 2;  // the number of the pushbutton pin
-int button1State = 0;  // variable for reading the pushbutton status
-
-//two more buttons for extra credit
-/*
-const int button2Pin = 3;  // the number of the pushbutton pin
-int button2State = 0;  // variable for reading the pushbutton status
-
-const int button3Pin = ;  // the number of the pushbutton pin
-int button3State = 0;  // variable for reading the pushbutton status
-*/
-
-// LIQUID CRYSTAL DISPLAY
-/*
-#include <LiquidCrystal.h>
-
-// initialize the library by associating any needed LCD interface pin
-// with the arduino pin number it is connected to
-const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
-LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
-*/
-
-// LIMIT SWITCH
-int limitSwitch = 8;  // the number of the limit switch pin
 
 void setup()
 {
@@ -56,45 +47,75 @@ void setup()
 
   pinMode(limitSwitch, INPUT_PULLUP); 
 
-  pinMode(button1Pin, INPUT);
+  pinMode(startButtonPin, INPUT_PULLUP);
+  pinMode(clockwiseButtonPin, INPUT_PULLUP);
+  pinMode(counterButtonPin, INPUT_PULLUP);
 
-  //more stuff here for extra credit
+  pinMode(red_LED, OUTPUT);
+  pinMode(green_LED, OUTPUT);
+  pinMode(blue_LED, OUTPUT);
 }
 
 void loop()
 {
-   //potentiometer
-  /*
-  potVal = analogRead(potPin);   // read the potentiometer value at the input pin
-  Serial.write(potVal);  // print the value pooped by the potentiometer
-  */
-  
+  int redVal= 0;
+  int greenVal = 0;
+  int blueVal = 0;
 
-  button1State = digitalRead(button1Pin);
-  if (button1State == HIGH) {
-    flowRate = 10.0; //random value for lols, but it should be based on potentiometer
-  } else {
+
+
+  if (digitalRead(startButtonPin) == LOW) {
+    
+    
+    // LED COLOR SHOULD BE GREEN  
+    greenVal = 255;
+  } else {  // syrige is paused
     flowRate = 0;
-  }
 
-  // Here's some code for other button stuff that I felt like writing
-  //for clockwise motion?
-  /*
-  button2State = digitalRead(button2Pin);
-  if (button2State == HIGH) {
-    speed = 100; //random value for lols, but it should be based on potentiometer
-  } else {
-    speed = 0;
+    //YELLOW LED
+    redVal = 255;
+    greenVal = 175; //hopefully for a darker yellow
+    blueVal = 0;
   }
-
-  // set speed to negative for the other way...crazy
-*/
-  if (digitalRead(limitSwitch) == 1){
-    // this is when the switch is clicked
-    flowRate = 0;  // I would assume this would stop the motor by eventually setting speed to 0, but I have been wrong before
-  }
-
+  
   convertFlowToSpeed(); 
+
+
+
+
+  if (digitalRead(limitSwitch) == HIGH){
+    // this is when the switch is clicked
+
+    speed = 0; //setting speed so that flow rate is remembered
+    
+
+    // CHANGE LED TO RED
+    redVal = 255;
+    greenVal = 0;
+    blueVal = 0;
+
+    //print 0 here
+  }
+
+  else if (digitalRead(clockwiseButtonPin) == LOW) {
+    speed = 50;
+
+    //print conversion from 50 here
+    Serial.println(convertSpeedToFlow(speed));
+  }
+
+  else if (digitalRead(counterButtonPin) == LOW) {
+    speed = -50;
+
+    //print conversion from -50 here
+    Serial.println(convertSpeedToFlow(speed));
+  }
+  else {
+    Serial.println(flowRate);
+  }
+  analogWrite(red_LED, redVal);
+  analogWrite(green_LED, greenVal);
+  analogWrite(blue_LED, blueVal);
 
   // should this go here??? I mean maybe. seems weird to constantly set speed but I feel like it makes sense
   stepper.setSpeed(speed);
@@ -103,26 +124,21 @@ void loop()
 
 // run this in setup and in loop
 void convertFlowToSpeed(){ 
-  //helpful to know that each step is 1.8 degrees and 200 steps is a full rotation
-  //should speed be a float???
-  //need to also account for syringe pump diameter
-  speed = flowRate * 100; //This is a placeholder, there will be correct stuff here later I hope
+  float area = (3.141592 * pow(syringeDiameter / 10.0, 2)) / 4.0;
+  Serial.print("area: ");
+  Serial.println(area);
+
+
+  Serial.print("max flow rate: ");
+  Serial.println(maxFlowRate);
+
+  // Serial.println((flowRate/60.0));
+  speed = ((maxFlowRate/60.0) * 250.0)/area; //change to flowRate
+
+  Serial.println(((maxFlowRate/60.0) * 250.0)/area);
+  Serial.println(speed);
 }
-
-// a possibly useful button function
 /*
-int buttonPressed(uint8_t button) {
-  static uint16_t lastStates = 0;
-  uint8_t state = digitalRead(button);
-  if (state != ((lastStates >> button) & 1)) {
-    lastStates ^= 1 << button;
-    return state == HIGH;
-  }
-  return false;
-}*/
-
-// for display, probably a funciton for calculating amount of time remaining cause I don't wanna write the code in the loop
-/*float timeRemaining(){
-  // dang, we'll probably need to have the position, I hope the library has a built in position, but we'll need to calc pos anyways
-  return 0;
+float convertSpeedToFlow(int spd){
+  return (60 * spd * ((3.141592 * pow(syringeDiameter * 10, 2)) / 4)) / 250;
 }*/
