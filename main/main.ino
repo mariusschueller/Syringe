@@ -1,144 +1,90 @@
-#include <AccelStepper.h>
+#include <AccelStepper.h> 
 
-AccelStepper stepper(AccelStepper::DRIVER, 3, 2); 
+AccelStepper stepper(AccelStepper::DRIVER, 3, 2);  
 
-// In (mL/min). This will be used to determine speed. Will change with Potentiometer
-//Will be a max
-float maxFlowRate = 50.0;
-float flowRate = maxFlowRate;
+float flowRate = 50.0;  // mL/min 
 
-int speed;  //this will change depending on the Potentiometer reading...should it be a float?
+int speed;  // steps/sec 
 
-float syringeDiameter = 14.0; //14 mm or 18.5 mm according to what I measured
+float syringeDiameter = 14.0;  // 14 mm or 18.5 mm 
 
- //8mm lead screw
-int leadScrewPitch = 8;
+int leadScrewPitch = 8;  // 8mm lead screw 
 
-//BUTTON STUFF
-const int startButtonPin = 7;  // the number of the pushbutton pin
-const int clockwiseButtonPin = 12;  // the number of the pushbutton pin
+//BUTTONS 
+const int startButtonPin = 7;  // the number of the pushbutton pin 
+const int clockwiseButtonPin = 12;  // the number of the pushbutton pin 
+const int counterButtonPin = 13;  // the number of the pushbutton pin 
 
-const int counterButtonPin = 13;  // the number of the pushbutton pin
+// LIMIT SWITCH 
+int limitSwitch = 6;  // the number of the limit switch pin 
 
+//LEDs 
+int red_LED = 9;  // Red led pin 
+int green_LED = 10;  // Green led pin 
+int blue_LED = 11;  // Blue led pin 
 
-// LIMIT SWITCH
-int limitSwitch = 6;  // the number of the limit switch pin
+void setup() 
+{ 
+  convertFlowToSpeed();  //speed gets set in this function 
+  stepper.setMaxSpeed(1000); 
+  stepper.setSpeed(speed);  
 
+  // Get all of the buttons set 
+  pinMode(limitSwitch, INPUT_PULLUP);  
+  pinMode(startButtonPin, INPUT_PULLUP); 
+  pinMode(clockwiseButtonPin, INPUT_PULLUP); 
+  pinMode(counterButtonPin, INPUT_PULLUP); 
 
-//LED CODE HERE
-int red_LED = 9;
-int green_LED = 10;
-int blue_LED = 11;
+  // get all of the LEDs set 
+  pinMode(red_LED, OUTPUT); 
+  pinMode(green_LED, OUTPUT); 
+  pinMode(blue_LED, OUTPUT); 
+} 
 
-//POTENTIOMETER STUFF
-// INPUT: Potentiometer should be connected to 5V and GND
+void loop() 
+{ 
+  // value between 0 and 255 for the color of the LED 
+  int redVal= 0; 
+  int greenVal = 0; 
+  int blueVal = 0; 
 
+  if (digitalRead(startButtonPin) == LOW) { 
+    // set the speed 
+    convertFlowToSpeed();  
 
-void setup()
-{
-  Serial.begin(9600);  // it doesn't look like it, but this allows you to print
+    greenVal = 255; 
+  } 
+  else {  
+    speed = 0; 
+    
+    redVal = 255; 
+    greenVal = 175;  
+  } 
 
-  convertFlowToSpeed(); //speed gets get in this function
+  if (digitalRead(counterButtonPin) == LOW) { 
+    speed = -50; 
+  } 
 
-  stepper.setMaxSpeed(1000); // not sure if this is what it's supposed to be
+  else if (digitalRead(limitSwitch) == HIGH){ 
+    speed = 0;  
+    redVal = 255; 
+    greenVal = 0; 
+  } 
+
+  else if (digitalRead(clockwiseButtonPin) == LOW) { 
+    speed = 50; 
+  }  
+
+  analogWrite(red_LED, redVal); 
+  analogWrite(green_LED, greenVal); 
+  analogWrite(blue_LED, blueVal); 
+
   stepper.setSpeed(speed); 
-  
-  // probably set flow rate here with a function if we're feeling saucy
+  stepper.runSpeed(); 
+} 
 
-  pinMode(limitSwitch, INPUT_PULLUP); 
-
-  pinMode(startButtonPin, INPUT_PULLUP);
-  pinMode(clockwiseButtonPin, INPUT_PULLUP);
-  pinMode(counterButtonPin, INPUT_PULLUP);
-
-  pinMode(red_LED, OUTPUT);
-  pinMode(green_LED, OUTPUT);
-  pinMode(blue_LED, OUTPUT);
-}
-
-void loop()
-{
-  int redVal= 0;
-  int greenVal = 0;
-  int blueVal = 0;
-
-
-
-  if (digitalRead(startButtonPin) == LOW) {
-    
-    
-    // LED COLOR SHOULD BE GREEN  
-    greenVal = 255;
-  } else {  // syrige is paused
-    flowRate = 0;
-
-    //YELLOW LED
-    redVal = 255;
-    greenVal = 175; //hopefully for a darker yellow
-    blueVal = 0;
-  }
-  
-  convertFlowToSpeed(); 
-
-
-
-
-  if (digitalRead(limitSwitch) == HIGH){
-    // this is when the switch is clicked
-
-    speed = 0; //setting speed so that flow rate is remembered
-    
-
-    // CHANGE LED TO RED
-    redVal = 255;
-    greenVal = 0;
-    blueVal = 0;
-
-    //print 0 here
-  }
-
-  else if (digitalRead(clockwiseButtonPin) == LOW) {
-    speed = 50;
-
-    //print conversion from 50 here
-    Serial.println(convertSpeedToFlow(speed));
-  }
-
-  else if (digitalRead(counterButtonPin) == LOW) {
-    speed = -50;
-
-    //print conversion from -50 here
-    Serial.println(convertSpeedToFlow(speed));
-  }
-  else {
-    Serial.println(flowRate);
-  }
-  analogWrite(red_LED, redVal);
-  analogWrite(green_LED, greenVal);
-  analogWrite(blue_LED, blueVal);
-
-  // should this go here??? I mean maybe. seems weird to constantly set speed but I feel like it makes sense
-  stepper.setSpeed(speed);
-  stepper.runSpeed();
-}
-
-// run this in setup and in loop
-void convertFlowToSpeed(){ 
-  float area = (3.141592 * pow(syringeDiameter / 10.0, 2)) / 4.0;
-  Serial.print("area: ");
-  Serial.println(area);
-
-
-  Serial.print("max flow rate: ");
-  Serial.println(maxFlowRate);
-
-  // Serial.println((flowRate/60.0));
-  speed = ((maxFlowRate/60.0) * 250.0)/area; //change to flowRate
-
-  Serial.println(((maxFlowRate/60.0) * 250.0)/area);
-  Serial.println(speed);
-}
-/*
-float convertSpeedToFlow(int spd){
-  return (60 * spd * ((3.141592 * pow(syringeDiameter * 10, 2)) / 4)) / 250;
-}*/
+// set the global speed variable here based on flow rate 
+void convertFlowToSpeed(){  
+  float area = (3.141592 * pow(syringeDiameter / 10.0, 2)) / 4.0; 
+  speed = ((flowRate/60.0) * 250.0)/area;  
+} 
